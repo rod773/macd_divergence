@@ -151,3 +151,6 @@ alertcondition(bullClassical, title='Classical Bull', message='Classical bullish
 alertcondition(bullReverse, title='Reverse Bull', message='Reverse bullish divergence on: {{ticker}}')
 alertcondition(bearClassical, title='Classical Bear', message='Classical bearish divergence on: {{ticker}}')
 alertcondition(bearReverse, title='Reverse Bear', message='Reverse bearish divergence on: {{ticker}}')
+
+barcolor(bullClassical ? color.green : bullReverse ? color.new(color.green, 50) : bearClassical ? color.red : bearReverse ? color.new(color.red, 50) : na)
+bgcolor(bullClassical ? color.new(color.green, 85) : bullReverse ? color.new(color.green, 92) : bearClassical ? color.new(color.red, 85) : bearReverse ? color.new(color.red, 92) : na)
