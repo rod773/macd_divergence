@@ -1,0 +1,148 @@
+//@version=5
+indicator("MACD Divergence (MQL5 port)", overlay=false, max_lines_count=500, max_labels_count=500)
+
+// --- Inputs (match MQL5)
+fastEMA  = input.int(12,  "fastEMA", minval=1)
+slowEMA  = input.int(26,  "slowEMA", minval=1)
+signalSMA = input.int(9,  "signalSMA", minval=1)
+
+drawIndicatorTrendLines = input.bool(true,  "drawIndicatorTrendLines")
+drawPriceTrendLines     = input.bool(true,  "drawPriceTrendLines")
+displayAlert            = input.bool(true, "displayAlert")
+
+// --- Constants
+ARROWS_DISPLACEMENT = 0.0001
+
+// --- MACD (Pine: macd() returns macdLine, signalLine, hist)
+[macdLine, signalLine, _hist] = ta.macd(close, fastEMA, slowEMA, signalSMA)
+
+// --- Plots (MACD main + signal)
+plot(macdLine,   color=color.fuchsia, title="Main",   linewidth=1)
+plot(signalLine, color=color.blue,    title="Signal", linewidth=1)
+
+// ===================== Divergence detection =====================
+// MQL5 checks MACD main local trough/peak with neighborhood comparisons.
+// Additionally, it searches backward for last trough/peak using the same 5-bar
+// extremum-pattern logic on both signal and macd.
+
+pivL = 2
+pivR = 2
+
+// Pivots (stable in Pine, avoids forward-referencing i+1/i+2 patterns)
+macdPivotLow  = ta.pivotlow(macdLine, pivL, pivR)
+macdPivotHigh = ta.pivothigh(macdLine, pivL, pivR)
+sigPivotLow   = ta.pivotlow(signalLine, pivL, pivR)
+sigPivotHigh  = ta.pivothigh(signalLine, pivL, pivR)
+
+// Current pivot values occur pivR bars ago
+macdPivotLowBarAgo  = pivR
+macdPivotHighBarAgo = pivR
+
+// Store previous pivot lows/highs for divergence comparison.
+var float prevMacdLow  = na
+var float prevLowPrice  = na
+var int   prevLowBarAgo = na
+
+var float prevMacdHigh = na
+var float prevHighPrice = na
+var int   prevHighBarAgo = na
+
+maxScan = input.int(200, "max divergence scan back", minval=20) // kept for UI parity (not used with pivot approach)
+
+// Divergence triggers on confirmed pivots.
+bullishDiv = false
+bearishDiv = false
+var string bullishType = ""
+var string bearishType = ""
+
+// For divergence we require both: MACD pivot and Signal pivot of the same type
+pivotBullConfirmed = not na(macdPivotLow) and not na(sigPivotLow)
+pivotBearConfirmed = not na(macdPivotHigh) and not na(sigPivotHigh)
+
+var int bullishLastBarAgo = na
+var int bearishLastBarAgo = na
+
+// On confirmed pivots (which happen pivR bars after the actual turning point)
+if pivotBullConfirmed
+    // bar where pivot occurred is pivR bars back
+    float macdNow = macdPivotLow
+    float priceNow = low[pivR]
+    if not na(prevMacdLow)
+        if macdNow > prevMacdLow and priceNow < prevLowPrice
+            bullishDiv := true
+            bullishType := "Classical bullish divergence"
+            bullishLastBarAgo := pivR
+        else if macdNow < prevMacdLow and priceNow > prevLowPrice
+            bullishDiv := true
+            bullishType := "Reverse bullish divergence"
+            bullishLastBarAgo := pivR
+    prevMacdLow := macdNow
+    prevLowPrice := priceNow
+    prevLowBarAgo := pivR
+
+if pivotBearConfirmed
+    float macdNowH = macdPivotHigh
+    float priceNowH = high[pivR]
+    if not na(prevMacdHigh)
+        if macdNowH < prevMacdHigh and priceNowH > prevHighPrice
+            bearishDiv := true
+            bearishType := "Classical bearish divergence"
+            bearishLastBarAgo := pivR
+        else if macdNowH > prevMacdHigh and priceNowH < prevHighPrice
+            bearishDiv := true
+            bearishType := "Reverse bearish divergence"
+            bearishLastBarAgo := pivR
+    prevMacdHigh := macdNowH
+    prevHighPrice := priceNowH
+    prevHighBarAgo := pivR
+
+// ===================== Plot arrows =====================
+// Pine plotshape() doesn't support y-positioning like MQL5 buffers.
+// So we render arrows on the MACD pane at fixed relative levels.
+// (Keeps the divergence marking functionality even if exact y-offset differs.)
+
+bullArrow = bullishDiv ? 1 : na
+bearArrow = bearishDiv ? -1 : na
+
+plotchar(bullArrow, title="Bullish divergence", char="▲", location=location.bottom, color=color.lime, size=size.tiny)
+plotchar(bearArrow, title="Bearish divergence", char="▼", location=location.top, color=color.red, size=size.tiny)
+
+// ===================== Trendlines =====================
+// MQL5 draws two possible lines between extrema indices: price line and indicator line.
+// In Pine we draw at the moment the signal is found.
+
+// (kept only for parity with MQL5; not required in Pine)
+var int lineCount = 0
+
+f_drawLine(int x1BarsAgo, float y1, int x2BarsAgo, float y2, color c) =>
+    // x values are bar_index - barsAgo
+    int x1 = bar_index - x1BarsAgo
+    int x2 = bar_index - x2BarsAgo
+    line l = line.new(x1, y1, x2, y2, xloc=xloc.bar_index, extend=extend.none, color=c)
+    l
+
+// Note: We use last idx as an offset relative to the current bar (bars ago).
+// Current extremum is at barsAgo=0.
+if bullishDiv and drawPriceTrendLines and not na(bullishLastBarAgo)
+    _ = f_drawLine(0, low, bullishLastBarAgo, low[bullishLastBarAgo], color.lime)
+
+if bullishDiv and drawIndicatorTrendLines and not na(bullishLastBarAgo)
+    _ = f_drawLine(0, macdLine, bullishLastBarAgo, macdLine[bullishLastBarAgo], color.lime)
+
+if bearishDiv and drawPriceTrendLines and not na(bearishLastBarAgo)
+    _ = f_drawLine(0, high, bearishLastBarAgo, high[bearishLastBarAgo], color.red)
+
+if bearishDiv and drawIndicatorTrendLines and not na(bearishLastBarAgo)
+    _ = f_drawLine(0, macdLine, bearishLastBarAgo, macdLine[bearishLastBarAgo], color.red)
+
+// ===================== Alerts =====================
+var int lastAlertTimeMs = na
+
+if displayAlert and (bullishDiv or bearishDiv)
+    // approximate 'once per candle time' using bar time
+    int tMs = int(time)
+    if na(lastAlertTimeMs) or tMs != lastAlertTimeMs
+        lastAlertTimeMs := tMs
+        string msg = bullishDiv ? ("MACD " + bullishType) : ("MACD " + bearishType)
+        alert(msg + " on " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar)
+
