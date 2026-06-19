@@ -113,12 +113,6 @@ if currentIndex > slow_length + 2
                 bearIdx := currentIndex - 1
                 bearLastIdx := lastPeak
 
-bullArrowY = bullClassical or bullReverse ? array.get(macdArr, bullIdx) - 0.0001 : na
-bearArrowY = bearClassical or bearReverse ? array.get(macdArr, bearIdx) + 0.0001 : na
-
-plot(bullArrowY, 'Bullish Divergence', color=color.green, style=plot.style_circles, linewidth=3)
-plot(bearArrowY, 'Bearish Divergence', color=color.red, style=plot.style_circles, linewidth=3)
-
 plotshape(bullClassical ? array.get(macdArr, bullIdx) : na, 'Classical Bull', shape.labelup, location.absolute, color.green, text='Bull', textcolor=color.white, size=size.small, offset=0)
 plotshape(bullReverse ? array.get(macdArr, bullIdx) : na, 'Reverse Bull', shape.labelup, location.absolute, color.new(color.green, 50), text='R Bull', textcolor=color.white, size=size.small, offset=0)
 plotshape(bearClassical ? array.get(macdArr, bearIdx) : na, 'Classical Bear', shape.labeldown, location.absolute, color.red, text='Bear', textcolor=color.white, size=size.small, offset=0)
