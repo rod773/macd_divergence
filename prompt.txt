@@ -1,0 +1,27 @@
+Project: MACD Divergence Detection
+
+This project implements MACD divergence detection across multiple platforms:
+- MQL5 indicator for MetaTrader 5 (macd_divergence.mq5)
+- MQL5 Expert Advisor for automated trading (macd_divergence_ea.mq5)
+- Pine Script v5 indicator for TradingView (macd_divergence.pine)
+- Python backtester (macd_divergence_backtest.py)
+
+Core Logic:
+1. Detect local troughs/peaks on MACD line using 3-condition extrema check
+2. Search backwards for last significant trough/peaks using Signal line (4-condition check) then MACD (4-condition check)
+3. Compare current and last extrema for price vs MACD divergence
+4. Classify as Classical (stronger reversal signal) or Reverse (trend continuation)
+
+Divergence Types:
+- Classical Bullish: Price Lower Low + MACD Higher Low
+- Reverse Bullish: Price Higher Low + MACD Lower Low
+- Classical Bearish: Price Higher High + MACD Lower High
+- Reverse Bearish: Price Lower High + MACD Higher High
+
+Files:
+- macd_divergence.mq5: MT5 indicator with trendlines and alerts
+- macd_divergence_ea.mq5: MT5 Expert Advisor with risk management
+- macd_divergence.pine: TradingView indicator matching MQL5 logic exactly
+- macd_divergence_backtest.py: Python backtester using yfinance data
+
+All implementations use the same divergence detection algorithm ported from the original MQL5 code.
