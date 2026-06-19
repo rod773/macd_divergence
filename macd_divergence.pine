@@ -119,10 +119,10 @@ bearArrowY = bearClassical or bearReverse ? array.get(macdArr, bearIdx) + 0.0001
 plot(bullArrowY, 'Bullish Divergence', color=color.green, style=plot.style_circles, linewidth=3)
 plot(bearArrowY, 'Bearish Divergence', color=color.red, style=plot.style_circles, linewidth=3)
 
-//plotshape(bullClassical, 'Classical Bull', shape.labelup, location.absolute, color.green, text='Bull', textcolor=color.white, size=size.small, offset=0)
-//plotshape(bullReverse, 'Reverse Bull', shape.labelup, location.absolute, color.new(color.green, 50), text='R Bull', textcolor=color.white, size=size.small, offset=0)
-//plotshape(bearClassical, 'Classical Bear', shape.labeldown, location.absolute, color.red, text='Bear', textcolor=color.white, size=size.small, offset=0)
-//plotshape(bearReverse, 'Reverse Bear', shape.labeldown, location.absolute, color.new(color.red, 50), text='R Bear', textcolor=color.white, size=size.small, offset=0)
+plotshape(bullClassical ? array.get(macdArr, bullIdx) : na, 'Classical Bull', shape.labelup, location.absolute, color.green, text='Bull', textcolor=color.white, size=size.small, offset=0)
+plotshape(bullReverse ? array.get(macdArr, bullIdx) : na, 'Reverse Bull', shape.labelup, location.absolute, color.new(color.green, 50), text='R Bull', textcolor=color.white, size=size.small, offset=0)
+plotshape(bearClassical ? array.get(macdArr, bearIdx) : na, 'Classical Bear', shape.labeldown, location.absolute, color.red, text='Bear', textcolor=color.white, size=size.small, offset=0)
+plotshape(bearReverse ? array.get(macdArr, bearIdx) : na, 'Reverse Bear', shape.labeldown, location.absolute, color.new(color.red, 50), text='R Bear', textcolor=color.white, size=size.small, offset=0)
 
 var line bullPriceLine = na
 var line bullIndicatorLine = na
