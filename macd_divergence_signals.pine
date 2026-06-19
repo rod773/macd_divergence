@@ -1,0 +1,46 @@
+//@version=5
+indicator(title='MACD Divergence Signals (Overlay)', overlay=true)
+
+// ═════════════════════════════════════════════════════════════════════════════
+//  MACD DIVERGENCE - SEÑALES EN EL GRÁFICO DE PRECIOS (OVERLAY)
+//  Señales visibles sobre el precio directamente
+// ═════════════════════════════════════════════════════════════════════════════
+
+// ── Inputs ────────────────────────────────────────────────────────────────
+group_divergences = "Divergencias"
+group_visuals     = "Visualizacion"
+
+showClassicalBull = input.bool(true, "D. Alcista Clasica", group=group_divergences)
+showReverseBull   = input.bool(true, "D. Alcista Oculta", group=group_divergences)
+showClassicalBear = input.bool(true, "D. Bajista Clasica", group=group_divergences)
+showReverseBear   = input.bool(true, "D. Bajista Oculta", group=group_divergences)
+
+fastLen           = input.int(12, "Fast Length", minval=1, group=group_divergences)
+slowLen           = input.int(26, "Slow Length", minval=1, group=group_divergences)
+signalLen         = input.int(9, "MACD Signal", minval=1, group=group_divergences)
+pivotLen          = input.int(5, "Swing Lookback", minval=2, maxval=50, group=group_divergences)
+
+showPriceLines    = input.bool(true, "Mostrar lineas de tendencia en precio", group=group_visuals)
+showLabels        = input.bool(true, "Mostrar etiquetas de texto", group=group_visuals)
+showArrows        = input.bool(true, "Mostrar flechas en precio", group=group_visuals)
+
+// ── MACD ──────────────────────────────────────────────────────────────────
+[macd_line, _, _] = ta.macd(close, fastLen, slowLen, signalLen)
+
+// ── Deteccion de pivotes ─────────────────────────────────────────────────
+pl     = ta.pivotlow(low, pivotLen, pivotLen)
+ph     = ta.pivothigh(high, pivotLen, pivotLen)
+plImpact!(impact_ln, impact_not_limiting)
+plMacd = ta.pivotlow(macd_line, pivotLen, pivotLen)
+phMacd = ta.pivothigh(macd_line, pivotLen, pivotLen)
+
+// Convergence condition
+convergence = 0.0
+if fastLen > 0
+    // basic convergence
+    convergence := 1.0
+    
+// ── Deteccion de divergencias ─────────────────────────────────────────────
+bullClassical = false
+bullReverse   = false
+bear
