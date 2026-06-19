@@ -1,148 +1,130 @@
 //@version=5
-indicator("MACD Divergence (MQL5 port)", overlay=false, max_lines_count=500, max_labels_count=500)
+indicator(title='MACD Divergence', timeframe='')
+// Getting inputs
 
-// --- Inputs (match MQL5)
-fastEMA  = input.int(12,  "fastEMA", minval=1)
-slowEMA  = input.int(26,  "slowEMA", minval=1)
-signalSMA = input.int(9,  "signalSMA", minval=1)
+fast_length = input(title='Fast Length', defval=12)
+slow_length = input(title='Slow Length', defval=26)
+src = input(title='Source', defval=close)
+signal_length = input.int(title='Signal Smoothing', minval=1, maxval=50, defval=9)
+sma_source = input.string(title='Oscillator MA Type', defval='EMA', options=['SMA', 'EMA'])
+sma_signal = input.string(title='Signal Line MA Type', defval='EMA', options=['SMA', 'EMA'])
+// Plot colors
+col_macd = input.color(#2962FF, 'MACD Line  ', group='Color Settings', inline='MACD')
+col_signal = input.color(#FF6D00, 'Signal Line  ', group='Color Settings', inline='Signal')
+col_grow_above = input.color(#26A69A, 'Above   Grow', group='Histogram', inline='Above')
+col_fall_above = input.color(#B2DFDB, 'Fall', group='Histogram', inline='Above')
+col_grow_below = input.color(#FFCDD2, 'Below Grow', group='Histogram', inline='Below')
+col_fall_below = input.color(#FF5252, 'Fall', group='Histogram', inline='Below')
+// Calculating
+fast_ma = sma_source == 'SMA' ? ta.sma(src, fast_length) : ta.ema(src, fast_length)
+slow_ma = sma_source == 'SMA' ? ta.sma(src, slow_length) : ta.ema(src, slow_length)
+macd = fast_ma - slow_ma
+signal = sma_signal == 'SMA' ? ta.sma(macd, signal_length) : ta.ema(macd, signal_length)
+hist = macd - signal
+plot(hist, title='Histogram', style=plot.style_columns, color=hist >= 0 ? hist[1] < hist ? col_grow_above : col_fall_above : hist[1] < hist ? col_grow_below : col_fall_below)
+plot(macd, title='MACD', color=col_macd)
+plot(signal, title='Signal', color=col_signal)
 
-drawIndicatorTrendLines = input.bool(true,  "drawIndicatorTrendLines")
-drawPriceTrendLines     = input.bool(true,  "drawPriceTrendLines")
-displayAlert            = input.bool(true, "displayAlert")
 
-// --- Constants
-ARROWS_DISPLACEMENT = 0.0001
+donttouchzero = input(title='Don\'t touch the zero line?', defval=true)
 
-// --- MACD (Pine: macd() returns macdLine, signalLine, hist)
-[macdLine, signalLine, _hist] = ta.macd(close, fastEMA, slowEMA, signalSMA)
+lbR = input(title='Pivot Lookback Right', defval=5)
+lbL = input(title='Pivot Lookback Left', defval=5)
+rangeUpper = input(title='Max of Lookback Range', defval=60)
+rangeLower = input(title='Min of Lookback Range', defval=5)
+plotBull = input(title='Plot Bullish', defval=true)
+plotHiddenBull = false
+plotBear = input(title='Plot Bearish', defval=true)
+plotHiddenBear = false
+bearColor = color.red
+bullColor = color.green
+hiddenBullColor = color.new(color.green, 80)
+hiddenBearColor = color.new(color.red, 80)
+textColor = color.white
+noneColor = color.new(color.white, 100)
+osc = macd
 
-// --- Plots (MACD main + signal)
-plot(macdLine,   color=color.fuchsia, title="Main",   linewidth=1)
-plot(signalLine, color=color.blue,    title="Signal", linewidth=1)
+plFound = na(ta.pivotlow(osc, lbL, lbR)) ? false : true
+phFound = na(ta.pivothigh(osc, lbL, lbR)) ? false : true
+_inRange(cond) =>
+    bars = ta.barssince(cond == true)
+    rangeLower <= bars and bars <= rangeUpper
 
-// ===================== Divergence detection =====================
-// MQL5 checks MACD main local trough/peak with neighborhood comparisons.
-// Additionally, it searches backward for last trough/peak using the same 5-bar
-// extremum-pattern logic on both signal and macd.
+//------------------------------------------------------------------------------
+// Regular Bullish
+// Osc: Higher Low
 
-pivL = 2
-pivR = 2
+oscHL = osc[lbR] > ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1]) and osc[lbR] < 0
 
-// Pivots (stable in Pine, avoids forward-referencing i+1/i+2 patterns)
-macdPivotLow  = ta.pivotlow(macdLine, pivL, pivR)
-macdPivotHigh = ta.pivothigh(macdLine, pivL, pivR)
-sigPivotLow   = ta.pivotlow(signalLine, pivL, pivR)
-sigPivotHigh  = ta.pivothigh(signalLine, pivL, pivR)
+// Price: Lower Low
 
-// Current pivot values occur pivR bars ago
-macdPivotLowBarAgo  = pivR
-macdPivotHighBarAgo = pivR
+priceLL = low[lbR] < ta.valuewhen(plFound, low[lbR], 1)
+priceHHZero = ta.highest(osc, lbL + lbR + 5)
+//plot(priceHHZero,title="priceHHZero",color=color.green)
+blowzero = donttouchzero ? priceHHZero < 0 : true
+bullCond = plotBull and priceLL and oscHL and plFound and blowzero
 
-// Store previous pivot lows/highs for divergence comparison.
-var float prevMacdLow  = na
-var float prevLowPrice  = na
-var int   prevLowBarAgo = na
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Regular Bullish', linewidth=2, color=bullCond ? bullColor : noneColor, transp=0)
 
-var float prevMacdHigh = na
-var float prevHighPrice = na
-var int   prevHighBarAgo = na
+plotshape(bullCond ? osc[lbR] : na, offset=-lbR, title='Regular Bullish Label', text=' Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
 
-maxScan = input.int(200, "max divergence scan back", minval=20) // kept for UI parity (not used with pivot approach)
+//------------------------------------------------------------------------------
+// Hidden Bullish
+// Osc: Lower Low
 
-// Divergence triggers on confirmed pivots.
-bullishDiv = false
-bearishDiv = false
-var string bullishType = ""
-var string bearishType = ""
+oscLL = osc[lbR] < ta.valuewhen(plFound, osc[lbR], 1) and _inRange(plFound[1])
 
-// For divergence we require both: MACD pivot and Signal pivot of the same type
-pivotBullConfirmed = not na(macdPivotLow) and not na(sigPivotLow)
-pivotBearConfirmed = not na(macdPivotHigh) and not na(sigPivotHigh)
+// Price: Higher Low
 
-var int bullishLastBarAgo = na
-var int bearishLastBarAgo = na
+priceHL = low[lbR] > ta.valuewhen(plFound, low[lbR], 1)
+hiddenBullCond = plotHiddenBull and priceHL and oscLL and plFound
 
-// On confirmed pivots (which happen pivR bars after the actual turning point)
-if pivotBullConfirmed
-    // bar where pivot occurred is pivR bars back
-    float macdNow = macdPivotLow
-    float priceNow = low[pivR]
-    if not na(prevMacdLow)
-        if macdNow > prevMacdLow and priceNow < prevLowPrice
-            bullishDiv := true
-            bullishType := "Classical bullish divergence"
-            bullishLastBarAgo := pivR
-        else if macdNow < prevMacdLow and priceNow > prevLowPrice
-            bullishDiv := true
-            bullishType := "Reverse bullish divergence"
-            bullishLastBarAgo := pivR
-    prevMacdLow := macdNow
-    prevLowPrice := priceNow
-    prevLowBarAgo := pivR
+plot(plFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish', linewidth=2, color=hiddenBullCond ? hiddenBullColor : noneColor, transp=0)
 
-if pivotBearConfirmed
-    float macdNowH = macdPivotHigh
-    float priceNowH = high[pivR]
-    if not na(prevMacdHigh)
-        if macdNowH < prevMacdHigh and priceNowH > prevHighPrice
-            bearishDiv := true
-            bearishType := "Classical bearish divergence"
-            bearishLastBarAgo := pivR
-        else if macdNowH > prevMacdHigh and priceNowH < prevHighPrice
-            bearishDiv := true
-            bearishType := "Reverse bearish divergence"
-            bearishLastBarAgo := pivR
-    prevMacdHigh := macdNowH
-    prevHighPrice := priceNowH
-    prevHighBarAgo := pivR
+plotshape(hiddenBullCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bullish Label', text=' H Bull ', style=shape.labelup, location=location.absolute, color=color.new(bullColor, 0), textcolor=color.new(textColor, 0))
 
-// ===================== Plot arrows =====================
-// Pine plotshape() doesn't support y-positioning like MQL5 buffers.
-// So we render arrows on the MACD pane at fixed relative levels.
-// (Keeps the divergence marking functionality even if exact y-offset differs.)
+//------------------------------------------------------------------------------
+// Regular Bearish
+// Osc: Lower High
 
-bullArrow = bullishDiv ? 1 : na
-bearArrow = bearishDiv ? -1 : na
+oscLH = osc[lbR] < ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1]) and osc[lbR] > 0
 
-plotchar(bullArrow, title="Bullish divergence", char="▲", location=location.bottom, color=color.lime, size=size.tiny)
-plotchar(bearArrow, title="Bearish divergence", char="▼", location=location.top, color=color.red, size=size.tiny)
+priceLLZero = ta.lowest(osc, lbL + lbR + 5)
+//plot(priceLLZero,title="priceLLZero", color=color.red)
+bearzero = donttouchzero ? priceLLZero > 0 : true
 
-// ===================== Trendlines =====================
-// MQL5 draws two possible lines between extrema indices: price line and indicator line.
-// In Pine we draw at the moment the signal is found.
 
-// (kept only for parity with MQL5; not required in Pine)
-var int lineCount = 0
+// Price: Higher High
 
-f_drawLine(int x1BarsAgo, float y1, int x2BarsAgo, float y2, color c) =>
-    // x values are bar_index - barsAgo
-    int x1 = bar_index - x1BarsAgo
-    int x2 = bar_index - x2BarsAgo
-    line l = line.new(x1, y1, x2, y2, xloc=xloc.bar_index, extend=extend.none, color=c)
-    l
+priceHH = high[lbR] > ta.valuewhen(phFound, high[lbR], 1)
 
-// Note: We use last idx as an offset relative to the current bar (bars ago).
-// Current extremum is at barsAgo=0.
-if bullishDiv and drawPriceTrendLines and not na(bullishLastBarAgo)
-    _ = f_drawLine(0, low, bullishLastBarAgo, low[bullishLastBarAgo], color.lime)
+bearCond = plotBear and priceHH and oscLH and phFound and bearzero
 
-if bullishDiv and drawIndicatorTrendLines and not na(bullishLastBarAgo)
-    _ = f_drawLine(0, macdLine, bullishLastBarAgo, macdLine[bullishLastBarAgo], color.lime)
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Regular Bearish', linewidth=2, color=bearCond ? bearColor : noneColor, transp=0)
 
-if bearishDiv and drawPriceTrendLines and not na(bearishLastBarAgo)
-    _ = f_drawLine(0, high, bearishLastBarAgo, high[bearishLastBarAgo], color.red)
+plotshape(bearCond ? osc[lbR] : na, offset=-lbR, title='Regular Bearish Label', text=' Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
 
-if bearishDiv and drawIndicatorTrendLines and not na(bearishLastBarAgo)
-    _ = f_drawLine(0, macdLine, bearishLastBarAgo, macdLine[bearishLastBarAgo], color.red)
+//------------------------------------------------------------------------------
+// Hidden Bearish
+// Osc: Higher High
 
-// ===================== Alerts =====================
-var int lastAlertTimeMs = na
+oscHH = osc[lbR] > ta.valuewhen(phFound, osc[lbR], 1) and _inRange(phFound[1])
 
-if displayAlert and (bullishDiv or bearishDiv)
-    // approximate 'once per candle time' using bar time
-    int tMs = int(time)
-    if na(lastAlertTimeMs) or tMs != lastAlertTimeMs
-        lastAlertTimeMs := tMs
-        string msg = bullishDiv ? ("MACD " + bullishType) : ("MACD " + bearishType)
-        alert(msg + " on " + syminfo.ticker + " " + timeframe.period, alert.freq_once_per_bar)
+// Price: Lower High
+
+priceLH = high[lbR] < ta.valuewhen(phFound, high[lbR], 1)
+
+hiddenBearCond = plotHiddenBear and priceLH and oscHH and phFound
+
+plot(phFound ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish', linewidth=2, color=hiddenBearCond ? hiddenBearColor : noneColor, transp=0)
+
+plotshape(hiddenBearCond ? osc[lbR] : na, offset=-lbR, title='Hidden Bearish Label', text=' H Bear ', style=shape.labeldown, location=location.absolute, color=color.new(bearColor, 0), textcolor=color.new(textColor, 0))
+
+
+
+alertcondition(bullCond, title='Bull', message='Regular Bull Div {{ticker}} XXmin')
+alertcondition(bearCond, title='Bear', message='Regular Bear Div {{ticker}} XXmin')
+alertcondition(hiddenBullCond, title='H Bull', message='Hidden Bull Div {{ticker}} XXmin')
+alertcondition(hiddenBearCond, title='H Bear', message='Hidden Bear Div {{ticker}} XXmin')
+
 
