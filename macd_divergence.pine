@@ -156,10 +156,10 @@ if bullClassical or bullReverse
     label.delete(bullLabel)
     lblText = bullClassical ? "Bull" : "R Bull"
     lblColor = bullClassical ? color.green : color.lime
-    bullLabel := label.new(array.get(timeArr, bullIdx), array.get(lowArr, bullIdx), lblText, yloc=yloc.belowbar, color=lblColor, textcolor=color.white, style=label.style_label_up, size=size.small)
+    bullLabel := label.new(bullIdx, array.get(lowArr, bullIdx), lblText, yloc=yloc.belowbar, color=lblColor, textcolor=color.white, style=label.style_label_up, size=size.small)
 
 if bearClassical or bearReverse
     label.delete(bearLabel)
     lblText = bearClassical ? "Bear" : "R Bear"
     lblColor = bearClassical ? color.red : color.fuchsia
-    bearLabel := label.new(array.get(timeArr, bearIdx), array.get(highArr, bearIdx), lblText, yloc=yloc.abovebar, color=lblColor, textcolor=color.white, style=label.style_label_down, size=size.small)
+    bearLabel := label.new(bearIdx, array.get(highArr, bearIdx), lblText, yloc=yloc.abovebar, color=lblColor, textcolor=color.white, style=label.style_label_down, size=size.small)
