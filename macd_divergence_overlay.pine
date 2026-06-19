@@ -1,0 +1,126 @@
+//@version=5
+indicator(title='MACD Divergence Overlay', overlay=true)
+
+fast_length = input.int(12, 'Fast Length')
+slow_length = input.int(26, 'Slow Length')
+signal_length = input.int(9, 'Signal Smoothing')
+drawPriceTrendLines = input.bool(true, 'Draw Price Trend Lines')
+
+[macd_line, signal_line, hist] = ta.macd(close, fast_length, slow_length, signal_length)
+
+var array<float> macdArr = array.new<float>()
+var array<float> sigArr = array.new<float>()
+var array<float> lowArr = array.new<float>()
+var array<float> highArr = array.new<float>()
+var array<int> timeArr = array.new<int>()
+
+array.push(macdArr, macd_line)
+array.push(sigArr, signal_line)
+array.push(lowArr, low)
+array.push(highArr, high)
+array.push(timeArr, time)
+
+arrSize = array.size(macdArr)
+
+isMacdTrough(idx) =>
+    (idx >= 2 and idx < arrSize - 2 and array.get(macdArr, idx) <= array.get(macdArr, idx - 1) and array.get(macdArr, idx) < array.get(macdArr, idx - 2) and array.get(macdArr, idx) <= array.get(macdArr, idx + 1) and array.get(macdArr, idx) < array.get(macdArr, idx + 2))
+
+isSigTrough(idx) =>
+    (idx >= 2 and idx < arrSize - 2 and array.get(sigArr, idx) <= array.get(sigArr, idx - 1) and array.get(sigArr, idx) <= array.get(sigArr, idx - 2) and array.get(sigArr, idx) <= array.get(sigArr, idx + 1) and array.get(sigArr, idx) <= array.get(sigArr, idx + 2))
+
+isMacdPeak(idx) =>
+    (idx >= 2 and idx < arrSize - 2 and array.get(macdArr, idx) >= array.get(macdArr, idx - 1) and array.get(macdArr, idx) > array.get(macdArr, idx - 2) and array.get(macdArr, idx) >= array.get(macdArr, idx + 1) and array.get(macdArr, idx) > array.get(macdArr, idx + 2))
+
+isSigPeak(idx) =>
+    (idx >= 2 and idx < arrSize - 2 and array.get(sigArr, idx) >= array.get(sigArr, idx - 1) and array.get(sigArr, idx) >= array.get(sigArr, idx - 2) and array.get(sigArr, idx) >= array.get(sigArr, idx + 1) and array.get(sigArr, idx) >= array.get(sigArr, idx + 2))
+
+findLastTrough(currentIdx) =>
+    foundIdx = 0
+    lastSigIdx = 0
+    searchEnd = math.min(arrSize - 3, currentIdx - 5)
+    if searchEnd >= 2
+        for i = 2 to searchEnd
+            if isSigTrough(i)
+                lastSigIdx := i
+        if lastSigIdx > 0
+            for j = 2 to lastSigIdx
+                if isMacdTrough(j)
+                    foundIdx := j
+    foundIdx
+
+findLastPeak(currentIdx) =>
+    foundIdx = 0
+    lastSigIdx = 0
+    searchEnd = math.min(arrSize - 3, currentIdx - 5)
+    if searchEnd >= 2
+        for i = 2 to searchEnd
+            if isSigPeak(i)
+                lastSigIdx := i
+        if lastSigIdx > 0
+            for j = 2 to lastSigIdx
+                if isMacdPeak(j)
+                    foundIdx := j
+    foundIdx
+
+currentIndex = arrSize - 1
+bullClassical = false
+bullReverse = false
+bearClassical = false
+bearReverse = false
+bullIdx = 0
+bullLastIdx = 0
+bearIdx = 0
+bearLastIdx = 0
+
+if currentIndex > slow_length + 2
+    if currentIndex >= 3 and array.get(macdArr, currentIndex - 1) <= array.get(macdArr, currentIndex - 2) and array.get(macdArr, currentIndex - 1) < array.get(macdArr, currentIndex - 3) and array.get(macdArr, currentIndex - 1) < array.get(macdArr, currentIndex)
+        lastTrough = findLastTrough(currentIndex - 2)
+        if lastTrough > 0
+            currentMACD = array.get(macdArr, currentIndex - 1)
+            lastMACD = array.get(macdArr, lastTrough)
+            currentLow = array.get(lowArr, currentIndex - 1)
+            lastLow = array.get(lowArr, lastTrough)
+            if currentMACD > lastMACD and currentLow < lastLow
+                bullClassical := true
+                bullIdx := currentIndex - 1
+                bullLastIdx := lastTrough
+            if currentMACD < lastMACD and currentLow > lastLow
+                bullReverse := true
+                bullIdx := currentIndex - 1
+                bullLastIdx := lastTrough
+
+    if currentIndex >= 3 and array.get(macdArr, currentIndex - 1) >= array.get(macdArr, currentIndex - 2) and array.get(macdArr, currentIndex - 1) > array.get(macdArr, currentIndex - 3) and array.get(macdArr, currentIndex - 1) > array.get(macdArr, currentIndex)
+        lastPeak = findLastPeak(currentIndex - 2)
+        if lastPeak > 0
+            currentMACD = array.get(macdArr, currentIndex - 1)
+            lastMACD = array.get(macdArr, lastPeak)
+            currentHigh = array.get(highArr, currentIndex - 1)
+            lastHigh = array.get(highArr, lastPeak)
+            if currentMACD < lastMACD and currentHigh > lastHigh
+                bearClassical := true
+                bearIdx := currentIndex - 1
+                bearLastIdx := lastPeak
+            if currentMACD > lastMACD and currentHigh < lastHigh
+                bearReverse := true
+                bearIdx := currentIndex - 1
+                bearLastIdx := lastPeak
+
+plotshape(bullClassical ? array.get(lowArr, bullIdx) : na, 'Classical Bull', shape.labelup, location.absolute, color.green, text='Bull', textcolor=color.white, size=size.small, offset=0)
+plotshape(bullReverse ? array.get(lowArr, bullIdx) : na, 'Reverse Bull', shape.labelup, location.absolute, color.new(color.green, 50), text='R Bull', textcolor=color.white, size=size.small, offset=0)
+plotshape(bearClassical ? array.get(highArr, bearIdx) : na, 'Classical Bear', shape.labeldown, location.absolute, color.red, text='Bear', textcolor=color.white, size=size.small, offset=0)
+plotshape(bearReverse ? array.get(highArr, bearIdx) : na, 'Reverse Bear', shape.labeldown, location.absolute, color.new(color.red, 50), text='R Bear', textcolor=color.white, size=size.small, offset=0)
+
+var line bullPriceLine = na
+var line bearPriceLine = na
+
+if bullClassical or bullReverse
+    line.delete(bullPriceLine)
+    lineColor = bullClassical ? color.green : color.new(color.green, 50)
+    if drawPriceTrendLines
+        bullPriceLine := line.new(array.get(timeArr, bullLastIdx), array.get(lowArr, bullLastIdx), array.get(timeArr, bullIdx), array.get(lowArr, bullIdx), xloc=xloc.bar_time, color=lineColor, width=2)
+
+if bearClassical or bearReverse
+    line.delete(bearPriceLine)
+    lineColor = bearClassical ? color.red : color.new(color.red, 50)
+    if drawPriceTrendLines
+        bearPriceLine := line.new(array.get(timeArr, bearLastIdx), array.get(highArr, bearLastIdx), array.get(timeArr, bearIdx), array.get(highArr, bearIdx), xloc=xloc.bar_time, color=lineColor, width=2)
